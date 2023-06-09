@@ -95,11 +95,20 @@ We used sentinel tokens to mark the opening and closing of an issue.
 ... <issue_closed (optional)> <eos>
 ```
 
-
-
 ##### Jupyter-scripts
+
+same as code
 
 ##### Jupyter-structured
 
+```makefile
+<jupyter_start><jupyter_text>TEXT<jupyter_code>CODE
+<jupyter_output>OUTPUT<jupyter_text> ...
+```
+
 ##### Git commits
+
+```makefile
+<commit_before>code<commit_msg>text<commit_after>code<eos>
+```
 
