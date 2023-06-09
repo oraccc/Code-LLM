@@ -50,7 +50,7 @@ training objective: $\mathcal{L} = \mathcal{L}_{MLM} + \mathcal{L}_{NSP}$
 
 ##### architecture
 
-<img src="C:\Users\v-yangxu1\AppData\Roaming\Typora\typora-user-images\image-20230609140111023.png" alt="image-20230609140111023" style="zoom: 33%;" />
+<img src="https://github.com/oraccc/Code-LLM/blob/master/imgs/starencoder.png?raw=true" alt="image-20230609140111023" style="zoom: 33%;" />
 
 ##### training strategy
 
