@@ -40,6 +40,8 @@
 
 ​		目前device_map只能做到最为基础的model parallelism (naive MP)，没有pipeline， 因此每个时刻只有一张卡在运行，效率很低
 
+---
+
 
 
 #### *parameters* load_in_8bit[(:link:)](https://huggingface.co/docs/transformers/main/main_classes/quantization)
