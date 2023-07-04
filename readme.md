@@ -1,12 +1,12 @@
-## Notes about loading, inferring and fine-tuning LLM
+# Notes about loading, inferring and fine-tuning LLM
 
 
 
-### *class* AutoModelForCausalLM
+## *class* AutoModelForCausalLM
 
-#### *classmethod* `from_pretrained`
+### *classmethod* `from_pretrained`
 
-##### *parameters* device_map
+#### *parameters* device_map
 
 * 在from_pretrained的时候便可以将模型加载到指定的GPU或CPU中
 
