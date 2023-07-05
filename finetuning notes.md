@@ -95,6 +95,62 @@ model = AutoModelForCausalLM.from_pretrained(
 
 * 当设置`torch_dtype = torch.float16`时，模型以fp16精度加载，否则默认以fp32精度加载
 
+---
+
+
+
+### *class* `TrainingAruguments`
+
+```python
+# sample: aruguments for fine-tuning starcoder
+training_args = TrainingArguments(
+    max_steps=arg.max_steps
+    per_device_train_batch_size=args.batch_size,
+    per_device_eval_batch_size=args.batch_size,
+    learning_rate=args.learning_rate,
+    lr_scheduler_type=args.lr_scheduler_type,
+    warmup_steps=args.num_warmup_steps,
+    gradient_accumulation_steps=args.gradient_accumulation_steps,
+    gradient_checkpointing=not args.no_gradient_checkpointing,
+    fp16=True,
+    bf16=False,
+    weight_decay=args.weight_decay,
+    run_name="starcoder-finetuned",
+    report_to="wandb",
+    deepspeed=args.deepspeed,
+)
+```
+
+#### *parameters* max_steps
+
+* 总的训练步数，一旦指明之后num_train_epoch便失效了(override)
+* 每次step用一个batch_size的样本训练
+
+#### *parameters* gradient_checkpointing
+
+* gradient checkpointing 开启后，在反向传播时会重新计算网络中间激活值
+
+* 开启此功能可以节省计算内存，但与此同时反向传播的速度会更慢（以时间换空间）
+
+#### *parameters* fp16/bf16
+
+* 是否使用fp16或者bf16混合精度运算，注意V100**不支持**bf16精度
+
+* 开启fp16精度计算之后，在多卡训练时可能会出现Runtime Error
+
+  ```bash
+  RuntimeError: expected scalar type Half but found Float
+  ```
+
+  * 解决办法参考此[:link:](https://stackoverflow.com/questions/75918140/getting-runtimeerror-expected-scalar-type-half-but-found-float-in-aws-p3-instan)：在原始代码的基础上做修改，添加torch.autocast()后错误消失，推测该错误可能与V100上的混合精度运算有关
+
+  * ```python
+    with torch.autocast("cuda"): 
+        trainer.train()
+    ```
+
+  * 注：原博主说在添加这串代码之后可能会出现loss的巨大浮动或者loss为0的情况，但目前的运行结果并没有出现这样的问题
+
 ## DeepSpeed :rocket:
 
 

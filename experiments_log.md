@@ -2,15 +2,16 @@
 
 #### finetuning starcoder
 
-| trainer parameters         | value    | notes                                      |
-| -------------------------- | -------- | ------------------------------------------ |
-| batch_size                 | 1        | per device train/eval batch size           |
-| learning_rate              | 1e-4     |                                            |
-| num_warmup                 | 100      |                                            |
-| lr_scheduler_type          | "cosine" |                                            |
-| gradient_accumlation_steps | 16       |                                            |
-| seq_length                 | 2048     |                                            |
-| fp16                       | True     | use fp16 16-bit (mixed) precision training |
+| trainer parameters         | value    | notes                                              |
+| -------------------------- | -------- | -------------------------------------------------- |
+| batch_size                 | 1        | per device train/eval batch size                   |
+| learning_rate              | 1e-4     |                                                    |
+| num_warmup                 | 100      |                                                    |
+| lr_scheduler_type          | "cosine" |                                                    |
+| gradient_accumlation_steps | 16       |                                                    |
+| gradient_checkpointing     | True     | save memory at the expense of slower backward pass |
+| seq_length                 | 2048     |                                                    |
+| fp16                       | True     | use fp16 16-bit (mixed) precision training         |
 
 
 | deepspeed ZeRO stage 3 parameters | value | notes                                                        |
