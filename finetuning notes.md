@@ -65,7 +65,7 @@ model = AutoModelForCausalLM.from_pretrained(
   * 目前device_map只能做到最为基础的model parallelism (naive MP)，没有pipeline， 因此每个时刻只有一张卡在运行，效率很低
    <img src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/parallelism-gpipe-bubble.png"  />
 
-#### *parameters* load_in_8bit[(:link:)](https://huggingface.co/docs/transformers/main/main_classes/quantization)
+#### *parameters* load_in_8bit [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/quantization)
 
 * 以8bit精度加载模型
 
@@ -151,7 +151,99 @@ training_args = TrainingArguments(
 
   * 注：原博主说在添加这串代码之后可能会出现loss的巨大浮动或者loss为0的情况，但目前的运行结果并没有出现这样的问题
 
+#### *parameters* deepspeed
+
+* 可以是一个deepspeed的配置文件路径，也可以直接传入deepspeed配置 *dict*
+
+---
+
+
+
 ## DeepSpeed :rocket:
+
+### Trainer Deepspeed Integration [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#deepspeed-integration)
+
+🤗 Transformers 通过Trainer集成了deepspeed的核心功能，因此不需要大幅修改原先代码，只需要提供deepspeed的配置文件即可
+
+> Integration of the core DeepSpeed features via [Trainer](https://huggingface.co/docs/transformers/main/en/main_classes/trainer#transformers.Trainer). This is an everything-done-for-you type of integration - just supply your custom config file or use our template and you have nothing else to do.
+
+* 对于**Training**过程，deepspeed支持ZeRO stage1, 2, 3与ZeRO-Infinity
+
+* 对于**Inferrring**过程， deepspeed支持ZeRO stage3与ZeRO-Infinity （因为stage2是对梯度做划分，因此对inference没有用）
+
+
+
+#### 运行DeepSpeed
+
+若要使用deepspeed，可以使用以下命令行运行
+
+```bash
+deepspeed --num_gpus=8 your_program.py <normal cl args> --deepspeed ds_config.json
+```
+
+若不指明num_gpus，则默认使用**全部的显卡**
+
+:exclamation:不支持在jupyter notebook上运行多GPU
+
+
+
+#### 使用ds_report自查
+
+在实际使用deepspeed运行代码之前，可以先检查一下deepspeed的运行环境，使用命令 `ds_report` 即可查看，需要注意需要保持system installed cuda (nvcc version) 与 pytorch cuda version的匹配，否则在运行时会报错。
+
+```bash
+DeepSpeed general environment info:
+torch install path ............... ['/anaconda/envs/starcoder/lib/python3.8/site-packages/torch']
+torch version .................... 1.12.1
+deepspeed install path ........... ['/anaconda/envs/starcoder/lib/python3.8/site-packages/deepspeed']
+deepspeed info ................... 0.9.5, unknown, unknown
+torch cuda version ............... 11.3
+torch hip version ................ None
+nvcc version ..................... 11.3
+deepspeed wheel compiled w. ...... torch 1.12, cuda 11.3
+```
+
+---
+
+
+
+### Shared Configuration [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#shared-configuration)
+
+在写deepspeed的configuration时，会注意到有很多参数与Trainer的TrainingAruguments有重复的部分，例如学习率，优化器参数等等，两者很容易混淆，但若是忽略掉这些参数不写，反而有时会引起程序的报错，提示deepspeed config缺少参数。因此官方较为推荐（并且实践起来没有出错）的一个做法便是使用参数`“auto”`，并将配置文件作为参数传递给TrainingAruguments，这样deepspeed可以自动读取Trainer的参数设定，或者让Trainer根据实际情况自动设置参数。
+
+当然也可以自己设置这些value，但是必须确保与Trainer一致，不然可能会造成不可预知的错误。
+
+> Note: currently DeepSpeed doesn’t validate parameter names, so if you misspell any, it’ll use the default setting for the parameter that got misspelled. You can watch the DeepSpeed engine start up log messages to see what values it is going to use.
+
+目前deepspeed config不支持拼写检查，因此用户需要自己检查拼写。
+
+一个简单的配置例子
+
+```json
+{
+    "optimizer": {
+      "type": "AdamW",
+      "params": {
+        "lr": "auto",
+        "betas": "auto",
+        "eps": "auto",
+        "weight_decay": "auto"
+      }
+    },
+    "scheduler": {
+      "type": "WarmupLR",
+      "params": {
+        "warmup_min_lr": "auto",
+        "warmup_max_lr": "auto",
+        "warmup_num_steps": "auto"
+      }
+    },
+    "gradient_accumulation_steps": "auto",
+    "gradient_clipping": "auto",
+    "train_batch_size": "auto",
+    "train_micro_batch_size_per_gpu": "auto"
+  }
+```
 
 
 
