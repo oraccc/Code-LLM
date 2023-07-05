@@ -261,6 +261,14 @@ DeepSpeed的ZeRO config文件也依据可以分为如下几类：
 * ZeRO Stage 2: 划分gradient。每个memory只保留它分配到的optimizer state所对应的梯度。
 * ZeRO Stage 3: 划分模型参数。ZeRO-3会在forward和backward的时候，自动将模型参数分配到多个memory。
 
+在实际情况中，stage2与3用的较多
+
+
+
+#### ZeRO Stage 2 配置
+
+常用的stage 2配置是
+
 
 
 ## 杂项 :wrench:
