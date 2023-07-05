@@ -6,7 +6,7 @@
 
 
 
-### *classmethod* `from_pretrained`
+### *classmethod*   `from_pretrained`
 
 ```python
 # sample1: load model in 8bit
@@ -99,7 +99,7 @@ model = AutoModelForCausalLM.from_pretrained(
 
 
 
-### *class* `TrainingAruguments`
+### *class*  `TrainingAruguments`
 
 ```python
 # sample: aruguments for fine-tuning starcoder
