@@ -269,6 +269,24 @@ DeepSpeed的ZeRO config文件也依据可以分为如下几类：
 
 常用的stage 2配置是
 
+```json
+{
+  "zero_optimization": {
+    "stage": 2,
+    "offload_optimizer": {
+      "device": "cpu",
+      "pin_memory": true
+    },
+    "allgather_partitions": true,
+    "allgather_bucket_size": 1e8,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "reduce_bucket_size": 1e8,
+    "contiguous_gradients": true
+  }
+}
+```
+
 
 
 ## 杂项 :wrench:
