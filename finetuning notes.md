@@ -14,9 +14,7 @@
 
 * 需要提前安装`accelerate`包（但无需在代码中import）
 
-* > You can let 🤗 Accelerate handle the device map computation by setting `device_map` to one of the supported options (`"auto"`, `"balanced"`, `"balanced_low_0"`, `"sequential"`) or create one yourself, if you want more control over where each layer should go.
-
-  可选的几种参数为"auto", "balanced", "balanced_low_0", "sequential", 或者自定义一个 *dict* 也可
+* 可选的几种参数为"auto", "balanced", "balanced_low_0", "sequential", 或者自定义一个 *dict* 也可
 
   * `auto` 与 `balanced` 类似，会将**模型平均划分**到所有可用的GPU上，这样可以将batch_size设大一些，注意如果GPU不够，auto会同时利用CPU存储一部分模型参数
 
@@ -25,7 +23,7 @@
   * `balanced_low_0`：会在除了第一张卡（"cuda:0"）之外的所有GPU上平均分配模型参数，这样可以在第一张卡上做一些额外的操作，例如当使用generate函数时存放输出数据
 
   * `sequential`：先尝试用第一张卡，当第一张卡用完时可以再用第二张卡，以此类推
-  
+
   * 一个自定义的例子 `device_map={'':Accelerator().process_index}`，将模型全部放入当前process所在的GPU中（process0对应的就是GPU0）
 
 * 查看当前model 的 device_map：`model.hf_device_map`
@@ -40,6 +38,8 @@
 
 ​		目前device_map只能做到最为基础的model parallelism (naive MP)，没有pipeline， 因此每个时刻只有一张卡在运行，效率很低
 
+​		<img src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/parallelism-gpipe-bubble.png"  />
+
 ---
 
 
@@ -47,8 +47,17 @@
 #### *parameters* load_in_8bit[(:link:)](https://huggingface.co/docs/transformers/main/main_classes/quantization)
 
 * 以8bit精度加载模型
+
 * 需要提前安装`bitsandbytes`包（但无需在代码中import）
+
 * 查看当前model所占的存储空间：`model.get_memory_footprint()`
+
+  * 返回bytes，常用语句
+
+    ```python
+    print(f"Memory footprint: {model.get_memory_footprint() / 1e6:.2f} MB")
+    ```
+
   * 可以看到以8bit精度加载的模型所占的内存非常少，starcoder只占了15939.61MB
 
 * 必须指定device_map
@@ -68,3 +77,12 @@
 
 
 ## 杂项 :wrench:
+
+
+
+### 训练时GPU显存
+
+* 当一个模型被加载到GPU中时，GPU的内核(kernel)也会被加载，因此即使我们放了一个很小的tensor到GPU中，也会看到GPU内存已经被占据了1~2GB，这就是kernel的大小；在实际显存计算中也需要考虑这一部分的影响。
+  * V100的kernel大小大致为1300MB
+
+* 在训练的时候，我们会注意到GPU的显存占用远比单纯加载model时要大得多。在训练时，有如下这些部分占了GPU显存
