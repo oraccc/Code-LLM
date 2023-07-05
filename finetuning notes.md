@@ -8,6 +8,32 @@
 
 ### *classmethod* `from_pretrained`
 
+```python
+# sample1: load model in 8bit
+model = AutoModelForCausalLM.from_pretrained(
+    model_path, 
+    load_in_8bit=True, 
+    device_map='auto'
+)
+
+# sample2: load model in fp16
+model = AutoModelForCausalLM.from_pretrained(
+    model_path,
+    use_cache=not no_gradient_checkpointing,
+    torch_dtype=torch.float16,
+)
+```
+
+#### *parameters* pretrained_model_name_or_path 
+
+* 需要加载的模型名称或者加载模型的本地路径
+
+#### *parameters* cache_dir
+
+* 指定模型下载的位置
+* :exclamation: 若使用Azure ML Studio提供的机器，记得第一次下载大模型时一定要将路径指明到`”/mnt/batch/tasks/shared/LS_root/mounts/clusters/xxxxx"`下，该路径下有充足的存储空间。默认的路径下存储空间只有60G，不足以存储大模型。
+* 将模型下载到本地之后，可以直接将`pretrained_model_name_or_path`改为本地存储的路径，不必每次都指定`cache_dir`
+
 #### *parameters* device_map [(:link:)](https://huggingface.co/docs/accelerate/usage_guides/big_modeling#loading-weights)
 
 * 在from_pretrained的时候便可以将模型加载到指定的GPU或CPU中， 若不指定，则默认加载到CPU中
@@ -35,14 +61,9 @@
 * :exclamation:**LIMITATIONS**: 
 
   > The model parallelism used when your model is split on several GPUs is naive and not optimized, meaning that only one GPU works at a given time and the other sits idle.
-
-​		目前device_map只能做到最为基础的model parallelism (naive MP)，没有pipeline， 因此每个时刻只有一张卡在运行，效率很低
-
-​		<img src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/parallelism-gpipe-bubble.png"  />
-
----
-
-
+  >
+  * 目前device_map只能做到最为基础的model parallelism (naive MP)，没有pipeline， 因此每个时刻只有一张卡在运行，效率很低
+   <img src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/parallelism-gpipe-bubble.png"  />
 
 #### *parameters* load_in_8bit[(:link:)](https://huggingface.co/docs/transformers/main/main_classes/quantization)
 
@@ -70,7 +91,9 @@
 
   load_in_8bit经常与lora搭配使用，lora会将原始model的参数固定，只使用一个低秩矩阵来更新参数，因此在传递梯度时只需要**input embedding** 去开启梯度传播，不需要整个模型去传播梯度（这也是这个function的第二点功能）
 
+#### *parameters* torch_dtype
 
+* 当设置`torch_dtype = torch.float16`时，模型以fp16精度加载，否则默认以fp32精度加载
 
 ## DeepSpeed :rocket:
 
@@ -80,9 +103,30 @@
 
 
 
-### 训练时GPU显存
+### GPU显存
 
-* 当一个模型被加载到GPU中时，GPU的内核(kernel)也会被加载，因此即使我们放了一个很小的tensor到GPU中，也会看到GPU内存已经被占据了1~2GB，这就是kernel的大小；在实际显存计算中也需要考虑这一部分的影响。
-  * V100的kernel大小大致为1300MB
+#### kernel的大小
 
-* 在训练的时候，我们会注意到GPU的显存占用远比单纯加载model时要大得多。在训练时，有如下这些部分占了GPU显存
+当一个模型被加载到GPU中时，GPU的内核(kernel)也会被加载，因此即使我们放了一个很小的tensor到GPU中，也会看到GPU内存已经被占据了1~2GB，这就是kernel的大小；在实际显存计算中也需要考虑这一部分的影响。
+* V100的kernel大小大致为1300MB
+
+#### 训练时的显存占用[(:link:)](https://huggingface.co/docs/transformers/perf_train_gpu_one#anatomy-of-models-memory)
+
+在训练的时候，我们会注意到GPU的显存占用远比单纯加载model时要大得多。在训练时，有如下这些部分占了GPU显存
+
+* model weights：模型的参数，注意当以fp16精度与fp32精度的区别
+
+  > 4 bytes * number of parameters for fp32 training
+  >
+  > 6 bytes * number of parameters for mixed precision training (maintains a model in fp32 and **one in fp16 in memory**)
+
+* optimizer states 
+
+* gradients :无论是以何种精度训练，梯度一律以fp32精度存储
+
+* forward activations saved for gradient computation : 激活值占了训练时的显存主要部分，与batch_size成正比，存储激活值用于梯度的计算
+
+* temporary buffers 
+
+* functionality-specific memory
+
