@@ -163,7 +163,7 @@ training_args = TrainingArguments(
 
 ### Trainer Deepspeed Integration [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#deepspeed-integration)
 
-🤗 Transformers 通过Trainer集成了deepspeed的核心功能，因此不需要大幅修改原先代码，只需要提供deepspeed的配置文件即可
+🤗 Transformers 通过Trainer友好集成了deepspeed的核心功能，因此不需要大幅修改原先代码，只需要提供deepspeed的配置文件即可
 
 > Integration of the core DeepSpeed features via [Trainer](https://huggingface.co/docs/transformers/main/en/main_classes/trainer#transformers.Trainer). This is an everything-done-for-you type of integration - just supply your custom config file or use our template and you have nothing else to do.
 
@@ -217,7 +217,7 @@ deepspeed wheel compiled w. ...... torch 1.12, cuda 11.3
 
 目前deepspeed config不支持拼写检查，因此用户需要自己检查拼写。
 
-一个简单的配置例子
+一个简单的配置例子（不完整），注意其中 `train_batch_size` 与 `train_micro_batch_size_per_gpu` 两个参数必须指定一个
 
 ```json
 {
@@ -244,6 +244,22 @@ deepspeed wheel compiled w. ...... torch 1.12, cuda 11.3
     "train_micro_batch_size_per_gpu": "auto"
   }
 ```
+
+### ZeRO 配置
+
+ZeRO有关的配置是整个ds_config文件中最为重要的部分
+
+ZeRO的实现方法是把参数占用分成三种类型。将这些类型的参数划分：
+
+- `optimizer states`：即优化器的参数状态。例如Adam的动量参数。
+- `gradients`：梯度缓存，对应于optimizer。
+- `parameters`：模型参数。
+
+DeepSpeed的ZeRO config文件也依据可以分为如下几类：
+
+* ZeRO Stage 1: 划分optimizer states。优化器参数被划分到多个memory上，每个momoey上的进程只负责更新它自己那部分参数
+* ZeRO Stage 2: 划分gradient。每个memory只保留它分配到的optimizer state所对应的梯度。
+* ZeRO Stage 3: 划分模型参数。ZeRO-3会在forward和backward的时候，自动将模型参数分配到多个memory。
 
 
 
