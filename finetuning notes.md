@@ -327,7 +327,13 @@ DeepSpeed的ZeRO config文件也依据可以分为如下几类：
 
   * 通过降低`allgather_bucket_size`与`reduce_bucket_size`，可以通过牺牲通讯时间来换取更多GPU显存，这样也可以设置更大的batch_size，**batch_size大小**与**训练速度**是一个需要权衡的要素
 
-* 
+* **reduce_bucket_size**：一次性减少的元素数目，与`allgather_bucket_size`同步，降低之后可以降低GPU显存
+
+
+
+#### ZeRO Stage 3 配置 [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#zero2-config)
+
+常用的stage 3配置是
 
 
 
