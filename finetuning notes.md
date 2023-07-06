@@ -208,6 +208,8 @@ deepspeed --num_gpus=8 your_program.py <normal cl args> --deepspeed ds_config.js
 
 :exclamation:不支持在jupyter notebook上运行多GPU
 
+:exclamation: deepspeed 目前会和 device_map 的设置相互冲突，例如，当device_map被设置成"auto"时，所有deepspeed的子进程均会在from_pretrain时就将模型加载到8块卡上，造成多倍的模型复制。因此最好不要将deepspeed与device_map联合使用，进一步地说，不要使用deepspeed训练8bit的模型
+
 
 
 #### 使用ds_report自查
@@ -267,6 +269,10 @@ deepspeed wheel compiled w. ...... torch 1.12, cuda 11.3
     "train_micro_batch_size_per_gpu": "auto"
   }
 ```
+
+---
+
+
 
 ### ZeRO 配置
 
@@ -334,6 +340,89 @@ DeepSpeed的ZeRO config文件也依据可以分为如下几类：
 #### ZeRO Stage 3 配置 [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#zero2-config)
 
 常用的stage 3配置是
+
+```json
+"zero_optimization": {
+    "stage": 3,
+    "offload_optimizer": {
+        "device": "cpu",
+        "pin_memory": true
+    },
+    "offload_param": {
+        "device": "cpu",
+        "pin_memory": true
+    },
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "sub_group_size": 1e9,
+    "reduce_bucket_size": "auto",
+    "stage3_prefetch_bucket_size": "auto",
+    "stage3_param_persistence_threshold": "auto",
+    "stage3_max_live_parameters": 1e9,
+    "stage3_max_reuse_distance": 1e9,
+    "stage3_gather_16bit_weights_on_model_save": true
+}
+```
+
+相较于stage 2， stage3多出的重要参数有
+
+* **offload_param**：将模型参数卸载到CPU或者NVMe上，启用这个功能可以释放GPU的内存，允许训练更大的模型或者使用更大的batch_size
+
+  * 可选参数有`"cpu"`,  `"nvme"`, `"none"`（不开启）
+
+  * 仅 stage 3均支持
+
+* **stage3_max_live_parameters**：在释放前每个GPU最大可以存储的参数数目，较小的值可以使用更小的内存，但是增加了通信开销
+
+* **stage3_max_reuse_distance**：如果某个参数在此阈值距离内被重用，那就不释放该参数，较小的值可以使用更小的内存，但会增加通信开销
+
+---
+
+
+
+### 如何选择合适的ZeRO？ [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#how-to-choose-which-zero-stage-and-offloads-to-use-for-best-performance)
+
+在考虑使用stage 3之前，可以先尝试检查一下是否真的需要使用stage 3，可使用如下代码
+
+```python
+# specify the model you want to train on your device
+model = AutoModelForCausalLM.from_pretrained(
+    local_model_path,
+    torch_dtype=torch.float16,
+) 
+# estimate the memory cost (both CPU and GPU)
+estimate_zero3_model_states_mem_needs_all_live(model, num_gpus_per_node=8, num_nodes=1)
+```
+
+该代码会给出在单机8卡的机器上平均每个GPU与CPU的内存需求，当然考虑到各种缓存，实际会需要更多。因此只能做一个大致的参考
+
+
+
+#### Speed-wise Rank
+
+***(Fast)*** Stage 0(DDP) > Stage 1 > Stage 2 > Stage2 + offload > Stage 3 > Stage 3 + offload ***(Slow)***
+
+
+
+#### GPU Memory Usage-wise
+
+***(Less Efficient)*** Stage 0(DDP) < Stage 1 < Stage 2 < Stage2 + offload < Stage 3 < Stage 3 + offload ***(More Efficient)***
+
+
+
+#### Step-by-step 选择策略
+
+1. 将batch_size设为1， 并开启HF Trainer的 gradient_checkpointing，直接训练， 若OOM
+2. 尝试 Stage 2， 若OOM
+3. 尝试 Stage 2，并开启offload_optimizer，若OOM
+4. 尝试 Stage 3， 若OOM
+5. 尝试开启 offload_param 到 CPU，若OOM
+6. 尝试开启 offload_optimizer 到 CPU，若OOM
+7. 尝试将模型的参数设得更低，或者开启fp16， bp16半精度
+
+以上是HF给出的推荐策略，这样可以最大效率提升训练速度，原则是**能直接多卡训练就不必使用ZeRO，能用ZeRO-2就不必用ZeRO-3**
+
+---
 
 
 
