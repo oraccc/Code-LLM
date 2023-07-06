@@ -96,6 +96,28 @@ model = AutoModelForCausalLM.from_pretrained(
 
 * 当设置`torch_dtype = torch.float16`时，模型以fp16精度加载，否则默认以fp32精度加载
 
+* :exclamation: 当模型以fp16精度加载的时候，**不要**与`prepare_model_for_int8_training`搭配使用，该函数会将所有非int8精度的数值强制转换成fp32精度，这样就与目的背道而驰了
+
+* 当以fp16精度加载模型并使用LoRA训练模型时，可能会出现以下Runtime Error
+
+  ```bash
+  Runtime Error: element 0 of tensors does not require grad and does not have a grad_fn
+  ```
+
+  这提示我们需要**在input embeddings开启梯度传播**（这其实是`prepare_model_for_int8_training`函数的第二点功能，但由于我们不能使用这个函数，因此需要手动开启），还问题具体的解决方法是调用方法`model.enable_input_require_grads()`
+
+  > Enables the gradients for the input embeddings. This is useful for fine-tuning adapter weights while keeping the model weights fixed.
+
+* 因此，当以fp16精度加载模型并使用LoRA来训练时，整体的流程如下
+
+  ```python
+  model.from_pretrained(path, torch_dtype=torch.float16)
+  model.enable_input_require_grads()
+  model.get_peft_model(model, lora_config)
+  ```
+
+  
+
 ---
 
 
@@ -218,7 +240,7 @@ deepspeed wheel compiled w. ...... torch 1.12, cuda 11.3
 
 目前deepspeed config不支持拼写检查，因此用户需要自己检查拼写。
 
-一个简单的配置例子（不完整），注意其中 `train_batch_size` 与 `train_micro_batch_size_per_gpu` 两个参数必须指定一个
+一个简单的配置例子（非完整版），注意其中 `train_batch_size` 与 `train_micro_batch_size_per_gpu` 两个参数必须指定一个
 
 ```json
 {
@@ -262,11 +284,11 @@ DeepSpeed的ZeRO config文件也依据可以分为如下几类：
 * ZeRO Stage 2: 划分gradient。每个memory只保留它分配到的optimizer state所对应的梯度。
 * ZeRO Stage 3: 划分模型参数。ZeRO-3会在forward和backward的时候，自动将模型参数分配到多个memory。
 
-在实际情况中，stage2与3用的较多
+在实际情况中，stage2与3更为实用
 
 
 
-#### ZeRO Stage 2 配置
+#### ZeRO Stage 2 配置 [(:link:)](https://huggingface.co/docs/transformers/main/main_classes/deepspeed#zero2-config)
 
 常用的stage 2配置是
 
@@ -287,6 +309,25 @@ DeepSpeed的ZeRO config文件也依据可以分为如下几类：
   }
 }
 ```
+
+一些重要的参数说明，这些参数往往是配置文件中最重要的部分，也是在改善性能是需要反复调整的参数，而配置文件中的其余参数官方强烈推荐直接设为`"auto"`：
+
+* **offload_optimizer**：将optimizer状态卸载到CPU或者NVMe上， 并将optimizer的计算卸载到cpu上，启用这个功能可以释放GPU的内存，允许训练更大的模型或者使用更大的batch_size
+
+  * 可选参数有`"cpu"`,  `"nvme"`, `"none"`（不开启）
+  * stage2与3均支持
+
+* **allgather_partitions**：在每个步骤结束时从所有GPU中收集更新后的参数
+
+* **allgather_bucket_size**：一次性收集的元素数目，降低该值可以降低所占的GPU显存，但会增加通讯开销
+
+* **overlap_comm**：尝试将梯度减少与反向计算重叠。若设为真，可以以增加GPU RAM为代价来降低延迟
+
+  * > `overlap_comm` uses 4.5x the `allgather_bucket_size` and `reduce_bucket_size` values. So if they are set to 5e8, this requires a 9GB footprint (`5e8 x 2Bytes x 2 x 4.5`). Therefore, if you have a GPU with 8GB or less RAM, to avoid getting OOM-errors you will need to reduce those parameters to about `2e8`, which would require 3.6GB. You will want to do the same on larger capacity GPU as well, if you’re starting to hit OOM.
+
+  * 通过降低`allgather_bucket_size`与`reduce_bucket_size`，可以通过牺牲通讯时间来换取更多GPU显存，这样也可以设置更大的batch_size，**batch_size大小**与**训练速度**是一个需要权衡的要素
+
+* 
 
 
 
