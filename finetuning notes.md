@@ -33,6 +33,7 @@ model = AutoModelForCausalLM.from_pretrained(
 * 指定模型下载的位置
 * :exclamation: 若使用Azure ML Studio提供的机器，记得第一次下载大模型时一定要将路径指明到`”/mnt/batch/tasks/shared/LS_root/mounts/clusters/xxxxx"`下，该路径下有充足的存储空间。默认的路径下存储空间只有60G，不足以存储大模型。
 * 将模型下载到本地之后，可以直接将`pretrained_model_name_or_path`改为本地存储的路径，不必每次都指定`cache_dir`
+* 另一种方式：参考[官方文档](https://huggingface.co/docs/transformers/installation?highlight=transformers_cache#cache-setup)直接在`bash.rc`里更改环境变量`HUGGINGFACE_HUB_CACHE`
 
 #### *parameters* device_map [(:link:)](https://huggingface.co/docs/accelerate/usage_guides/big_modeling#loading-weights)
 
